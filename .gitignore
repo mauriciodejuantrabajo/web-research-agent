@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.env
+.venv/
+venv/
+.pytest_cache/
+
+# Historial local de conversaciones (datos del usuario, no se versiona)
+history.json
+history.json.tmp
