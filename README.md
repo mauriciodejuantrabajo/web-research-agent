@@ -1,160 +1,163 @@
+> **Idioma / Language:** **English** · [Español](README.es.md)
+
 # 🌐 Web Research Agent
 
-Hacé una pregunta en **lenguaje natural** y el agente investiga en la web por sí
-mismo —busca, lee páginas y sintetiza— para responderte **con citas a las
-fuentes**. Usa **tool-calling nativo** con la API de **DeepSeek**: el modelo
-decide qué buscar y qué leer, y verás cada paso **en vivo**.
+Ask a question in **natural language** and the agent researches the web on its own
+—it searches, reads pages and synthesizes— to answer you **with citations to the
+sources**. It uses **native tool-calling** with the **DeepSeek** API: the model
+decides what to search and what to read, and you'll see every step **live**.
 
-Funciona con **interfaz web** (Streamlit, con historial y memoria) o por **CLI**.
+It works with a **web interface** (Streamlit, with history and memory) or via
+**CLI**.
 
 ```
-?  ¿Qué es el Model Context Protocol?
+?  What is the Model Context Protocol?
 
-  🔍 buscando: Model Context Protocol Anthropic
-  📄 leyendo: modelcontextprotocol.io
-  📄 leyendo: anthropic.com
+  🔍 searching: Model Context Protocol Anthropic
+  📄 reading: modelcontextprotocol.io
+  📄 reading: anthropic.com
 
-  Respuesta
-  El MCP es un protocolo abierto que estandariza cómo las aplicaciones proveen
-  contexto a los modelos de lenguaje [1]. Funciona como un "USB-C para IA",
-  conectando modelos a fuentes de datos y herramientas [2].
+  Answer
+  MCP is an open protocol that standardizes how applications provide context to
+  language models [1]. It works like a "USB-C for AI", connecting models to data
+  sources and tools [2].
 
-  Fuentes
+  Sources
   [1] Introduction - Model Context Protocol — modelcontextprotocol.io
   [2] Introducing the Model Context Protocol — anthropic.com
 ```
 
-El agente decidió por su cuenta la secuencia: buscó el tema, eligió las páginas
-más relevantes, las leyó y citó cada afirmación con su fuente.
+The agent figured out the sequence on its own: it searched the topic, picked the
+most relevant pages, read them and cited each statement with its source.
 
-## El problema
+## The problem
 
-Responder bien una pregunta con información de internet implica buscar, abrir
-varias páginas, leerlas, contrastar y **citar de dónde salió cada dato**. Hacerlo
-a mano es lento; pedírselo a un LLM "a secas" produce respuestas plausibles pero
-**sin fuentes y con riesgo de alucinación**.
+Answering a question well with information from the internet means searching,
+opening several pages, reading them, contrasting and **citing where each fact
+came from**. Doing it by hand is slow; asking an LLM "as is" produces plausible
+answers but **without sources and with a risk of hallucination**.
 
-## La solución
+## The solution
 
-Un **agente** (no un pipeline) que, dada una pregunta, decide por sí mismo qué
-hacer usando un patrón **ReAct** (Reason + Act):
+An **agent** (not a pipeline) that, given a question, decides on its own what to
+do using a **ReAct** pattern (Reason + Act):
 
-1. Recibe la pregunta junto con las herramientas disponibles.
-2. El **modelo elige** una herramienta (`web_search` o `read_url`) y sus argumentos.
-3. Se ejecuta y el resultado vuelve al modelo.
-4. Se repite hasta que tiene suficiente para responder **con citas [N]**.
+1. It receives the question along with the available tools.
+2. The **model picks** a tool (`web_search` or `read_url`) and its arguments.
+3. It runs and the result goes back to the model.
+4. This repeats until it has enough to answer **with citations [N]**.
 
-Cada página leída se numera como fuente en el orden en que se lee, y el sistema
-anexa la **bibliografía** al final automáticamente: así cada afirmación es
-**verificable** (anti-alucinación).
+Each page read is numbered as a source in the order it's read, and the system
+appends the **bibliography** at the end automatically: this makes every statement
+**verifiable** (anti-hallucination).
 
-## Características
+## Features
 
-- 🔎 **Investigación autónoma**: el modelo decide qué buscar y qué leer (ReAct).
-- 📚 **Respuestas con citas** verificables `[N]` + lista de fuentes.
-- 🖥️ **Interfaz web** (Streamlit): pasos en vivo, fuentes clicables, tema oscuro.
-- 💬 **Memoria conversacional**: dentro de una conversación podés hacer preguntas
-  de seguimiento ("¿y quién lo creó?") y el agente recuerda el contexto.
-- 🗂️ **Historial persistente**: cada conversación se guarda y se reabre desde el
-  panel lateral.
-- 🧪 **Tests sin red**: el CI no consume tu cuota de API.
+- 🔎 **Autonomous research**: the model decides what to search and read (ReAct).
+- 📚 **Answers with verifiable citations** `[N]` + source list.
+- 🖥️ **Web interface** (Streamlit): live steps, clickable sources, dark theme.
+- 💬 **Conversational memory**: within a conversation you can ask follow-up
+  questions ("and who created it?") and the agent remembers the context.
+- 🗂️ **Persistent history**: each conversation is saved and reopened from the side
+  panel.
+- 🧪 **Network-free tests**: the CI doesn't consume your API quota.
 
-## Herramientas
+## Tools
 
-| Herramienta | Qué hace |
-|-------------|----------|
-| `web_search(query, max_results)` | Busca en la web (DuckDuckGo, sin API key) y devuelve título, URL y snippet |
-| `read_url(url)` | Descarga una página, limpia el HTML (quita nav/scripts/footer) y devuelve su texto |
+| Tool | What it does |
+|------|--------------|
+| `web_search(query, max_results)` | Searches the web (DuckDuckGo, no API key) and returns title, URL and snippet |
+| `read_url(url)` | Downloads a page, cleans the HTML (removes nav/scripts/footer) and returns its text |
 
-## Arquitectura
+## Architecture
 
 ```
-app.py            Interfaz web (Streamlit): historial + memoria + pasos en vivo.
+app.py            Web interface (Streamlit): history + memory + live steps.
 src/
-├── llm.py        Cliente DeepSeek (API compatible OpenAI): tool-calling.
-├── tools.py      web_search + read_url + SourceRegistry (numera y deduplica citas).
-├── agent.py      Loop ReAct: el modelo elige tools hasta poder responder con [N].
-├── history.py    Persistencia de conversaciones en history.json (memoria).
-└── main.py       CLI interactivo (rich) con streaming de pasos en vivo.
-tests/            Tests con mocks (sin red real ni llamadas a la API).
+├── llm.py        DeepSeek client (OpenAI-compatible API): tool-calling.
+├── tools.py      web_search + read_url + SourceRegistry (numbers and dedupes citations).
+├── agent.py      ReAct loop: the model picks tools until it can answer with [N].
+├── history.py    Conversation persistence in history.json (memory).
+└── main.py       Interactive CLI (rich) with live step streaming.
+tests/            Tests with mocks (no real network, no API calls).
 ```
 
-## Requisitos
+## Requirements
 
 - **Python 3.10+**
-- Una **API key de DeepSeek** → se obtiene en https://platform.deepseek.com
+- A **DeepSeek API key** → get it at https://platform.deepseek.com
 
-## Instalación
+## Installation
 
 ```bash
-# 1. Clonar el repo
+# 1. Clone the repo
 git clone https://github.com/mauriciodejuantrabajo/web-research-agent.git
 cd web-research-agent
 
-# 2. (Opcional) crear un entorno virtual
+# 2. (Optional) create a virtual environment
 python -m venv .venv
 # Windows:  .venv\Scripts\activate
 # Linux/Mac: source .venv/bin/activate
 
-# 3. Instalar dependencias
+# 3. Install dependencies
 pip install -r requirements.txt
 
-# 4. Configurar la API key (ver siguiente sección)
+# 4. Configure the API key (see next section)
 ```
 
-## Configuración
+## Configuration
 
-Copiá la plantilla de variables de entorno y completá tu API key:
+Copy the environment variables template and fill in your API key:
 
 ```bash
-cp .env.example .env       # en Windows: copy .env.example .env
+cp .env.example .env       # on Windows: copy .env.example .env
 ```
 
-Editá `.env` y poné tu key de DeepSeek:
+Edit `.env` and set your DeepSeek key:
 
 ```env
-DEEPSEEK_API_KEY=sk-tu-key-real-aca
+DEEPSEEK_API_KEY=sk-your-real-key-here
 DEEPSEEK_MODEL=deepseek-v4-flash
 DEEPSEEK_BASE_URL=https://api.deepseek.com
 ```
 
-> 🔒 **El archivo `.env` está en `.gitignore` y nunca se sube al repo.** Tu API key
-> queda solo en tu máquina. El archivo versionado es `.env.example`, que solo
-> contiene un placeholder (`sk-...`).
+> 🔒 **The `.env` file is in `.gitignore` and is never committed.** Your API key
+> stays only on your machine. The versioned file is `.env.example`, which only
+> contains a placeholder (`sk-...`).
 
-## Uso
+## Usage
 
-### Interfaz web (recomendada)
+### Web interface (recommended)
 
 ```bash
 streamlit run app.py
 ```
 
-Se abre en `http://localhost:8501`. Escribí tu pregunta, mirá cómo el agente busca
-y lee en vivo, y obtené la respuesta con sus fuentes. Podés hacer **preguntas de
-seguimiento** (recuerda la conversación) y reabrir **conversaciones anteriores**
-desde el panel lateral.
+It opens at `http://localhost:8501`. Type your question, watch the agent search
+and read live, and get the answer with its sources. You can ask **follow-up
+questions** (it remembers the conversation) and reopen **previous conversations**
+from the side panel.
 
 ### CLI
 
 ```bash
-python -m src.main                                       # modo interactivo
-python -m src.main "¿Qué es el Model Context Protocol?"  # pregunta única
+python -m src.main                                       # interactive mode
+python -m src.main "What is the Model Context Protocol?"  # single question
 ```
 
-Dentro del CLI verás cada búsqueda/lectura en vivo y, al final, la respuesta con
-citas `[N]` y la lista de fuentes. `salir` para terminar.
+Inside the CLI you'll see each search/read live and, at the end, the answer with
+`[N]` citations and the source list. `salir` to exit.
 
-## El modelo
+## The model
 
-Se usa la API de **DeepSeek** (formato compatible con OpenAI). El modelo es
-configurable en `.env` sin tocar código:
+It uses the **DeepSeek** API (OpenAI-compatible format). The model is configurable
+in `.env` without touching code:
 
 ```env
 DEEPSEEK_MODEL=deepseek-v4-flash
 ```
 
-Si tu cuenta tiene otro modelo, basta con poner su identificador exacto en
+If your account has a different model, just put its exact identifier in
 `DEEPSEEK_MODEL`.
 
 ## Tests
@@ -163,16 +166,16 @@ Si tu cuenta tiene otro modelo, basta con poner su identificador exacto en
 pytest
 ```
 
-Los tests mockean `requests` y el buscador, y reemplazan el LLM por uno falso con
-respuestas predefinidas: **no se hace ninguna llamada de red real**, así el CI es
-reproducible y no consume tu cuota de API.
+The tests mock `requests` and the search engine, and replace the LLM with a fake
+one with predefined responses: **no real network call is made**, so the CI is
+reproducible and doesn't consume your API quota.
 
-## Privacidad y datos
+## Privacy and data
 
-- `.env` (tu API key) y `history.json` (tus conversaciones) **no se versionan**:
-  están en `.gitignore`.
-- El historial se guarda solo en tu máquina, en `history.json`.
+- `.env` (your API key) and `history.json` (your conversations) **are not
+  versioned**: they're in `.gitignore`.
+- The history is saved only on your machine, in `history.json`.
 
-## Licencia
+## License
 
 [MIT](LICENSE) © Mauricio De Juan
